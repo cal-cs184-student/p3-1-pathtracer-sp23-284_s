@@ -108,7 +108,7 @@ Vector3D PathTracer::zero_bounce_radiance(const Ray &r,
   // Returns the light that results from no bounces of light
 
 
-  return Vector3D(1.0);
+  return isect.bsdf->get_emission();
 
 
 }
@@ -162,7 +162,8 @@ Vector3D PathTracer::est_radiance_global_illumination(const Ray &r) {
     return envLight ? envLight->sample_dir(r) : L_out;
 
 
-  L_out = (isect.t == INF_D) ? debug_shading(r.d) : normal_shading(isect.n);
+  //L_out = (isect.t == INF_D) ? debug_shading(r.d) : normal_shading(isect.n);
+  L_out = zero_bounce_radiance(r, isect);
 
   // TODO (Part 3): Return the direct illumination.
 
