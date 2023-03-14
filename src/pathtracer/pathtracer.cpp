@@ -264,15 +264,35 @@ void PathTracer::raytrace_pixel(size_t x, size_t y) {
   double width = this->sampleBuffer.w;
   double height = this->sampleBuffer.h;
 
-  Vector3D result;
-  for (int i = 0; i < num_samples; i++) {
+  double s1 = 0.0, s2 = 0.0;
+  double mean, var;
+  int n = 0;
+  Vector3D result, cur;
+  for (int i = 0; i < num_samples; i++, n++) {
+
+    // part 5. Adaptive Sampling
+    if (i % samplesPerBatch == 0) {
+      mean = s1 / (double)n;
+      var = (s2 - (s1 * s1) / (double)n) / (double)(n - 1);
+      double I2 = 1.96 * 1.96 * var / (double)n;
+      if (I2 <= maxTolerance * maxTolerance * mean * mean)
+        break;
+    }
+
+    // part 1.2
     Vector2D sample = this->gridSampler->get_sample();
     Ray sample_ray = this->camera->generate_ray((origin.x + sample.x) / width, (origin.y + sample.y) / height);
     sample_ray.depth = max_ray_depth;
-    result += this->est_radiance_global_illumination(sample_ray);
+    cur = this->est_radiance_global_illumination(sample_ray);
+    result += cur;
+
+    // update s1, s2
+    double illum = cur.illum();
+    s1 += illum;
+    s2 += illum * illum;
   }
-  sampleBuffer.update_pixel(result / (double)num_samples, x, y);
-  sampleCountBuffer[x + y * sampleBuffer.w] = num_samples;
+  sampleBuffer.update_pixel(result / (double)n, x, y);
+  sampleCountBuffer[x + y * sampleBuffer.w] = n;
 }
 
 void PathTracer::autofocus(Vector2D loc) {
