@@ -114,8 +114,39 @@ PathTracer::estimate_direct_lighting_importance(const Ray &r,
   const Vector3D w_out = w2o * (-r.d);
   Vector3D L_out;
 
+  for (auto light = scene->lights.begin(); light != scene->lights.end(); light++) {
+    Vector3D wi;
+    double pdf;
+    double distToLight;
 
-  return Vector3D(1.0);
+    Vector3D L_light;
+    int num_samples = 0;
+    for (int i = 0; i < ns_area_light; i++) {
+      Vector3D L = (*light)->sample_L(hit_p, &wi, &distToLight, &pdf);
+      double costheta = dot(wi, isect.n);
+
+      // new rays from existing hit point
+      Vector3D next_o = hit_p;
+      Vector3D next_d = wi;
+      Ray next_r = Ray(next_o, next_d);
+      next_r.min_t = EPS_F;
+      next_r.max_t = distToLight - EPS_F;
+
+      Intersection next_i;
+      if (costheta > 0 && !(bvh->intersect(next_r, &next_i))) {
+        Vector3D f = isect.bsdf->f(w_out, wi);
+        L_light += f * L * costheta / pdf;
+      }
+      num_samples++;
+
+      // break if point light source
+      if ((*light)->is_delta_light())
+        break;
+    }
+    L_out += L_light / num_samples;
+  }
+
+  return L_out;
 
 }
 
