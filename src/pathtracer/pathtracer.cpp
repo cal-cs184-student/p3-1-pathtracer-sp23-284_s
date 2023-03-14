@@ -82,7 +82,7 @@ PathTracer::estimate_direct_lighting_hemisphere(const Ray &r,
     // new rays from existing hit point
     Vector3D next_o = hit_p;
     Vector3D next_d = o2w * wi;
-    Ray next_r = Ray(next_o, next_d);
+    Ray next_r = Ray(next_o, next_d, 1);
     next_r.min_t = EPS_F;
     Intersection next_i;
     if (costheta > 0 && bvh->intersect(next_r, &next_i)) {
@@ -128,7 +128,7 @@ PathTracer::estimate_direct_lighting_importance(const Ray &r,
       // new rays from existing hit point
       Vector3D next_o = hit_p;
       Vector3D next_d = wi;
-      Ray next_r = Ray(next_o, next_d);
+      Ray next_r = Ray(next_o, next_d, 1);
       next_r.min_t = EPS_F;
       next_r.max_t = distToLight - EPS_F;
 
@@ -188,6 +188,31 @@ Vector3D PathTracer::at_least_one_bounce_radiance(const Ray &r,
   // Returns the one bounce radiance + radiance from extra bounces at this point.
   // Should be called recursively to simulate extra bounces.
 
+  // one bounce
+  L_out += one_bounce_radiance(r, isect);
+
+  // extra bounces
+  double prob = 0.3;
+  if (coin_flip(prob))
+    return L_out;
+
+  Vector3D wi;
+  double pdf;
+
+  Vector3D f = isect.bsdf->sample_f(w_out, &wi, &pdf);
+  double costheta = dot(wi, Vector3D(0, 0, 1));
+
+  // new rays from existing hit point
+  Vector3D next_o = hit_p;
+  Vector3D next_d = o2w * wi;
+  Ray next_r = Ray(next_o, next_d);
+  next_r.min_t = EPS_F;
+  next_r.depth = r.depth - 1;
+  Intersection next_i;
+  if (next_r.depth > 0 && costheta > 0 && bvh->intersect(next_r, &next_i)) {
+    Vector3D Li = at_least_one_bounce_radiance(next_r, next_i);
+    L_out += f * Li * costheta / pdf / (1.0 - prob);
+  }
 
   return L_out;
 }
@@ -207,17 +232,19 @@ Vector3D PathTracer::est_radiance_global_illumination(const Ray &r) {
   // REMOVE THIS LINE when you are ready to begin Part 3.
   
   if (!bvh->intersect(r, &isect))
-    return envLight ? envLight->sample_dir(r) : L_out;
+    //return envLight ? envLight->sample_dir(r) : L_out;
+    return L_out;
 
 
   //L_out = (isect.t == INF_D) ? debug_shading(r.d) : normal_shading(isect.n);
   L_out = zero_bounce_radiance(r, isect);
 
   // TODO (Part 3): Return the direct illumination.
-  L_out += one_bounce_radiance(r, isect);
+  //L_out += one_bounce_radiance(r, isect);
 
   // TODO (Part 4): Accumulate the "direct" and "indirect"
   // parts of global illumination into L_out rather than just direct
+  L_out += at_least_one_bounce_radiance(r, isect);
 
   return L_out;
 }
@@ -241,6 +268,7 @@ void PathTracer::raytrace_pixel(size_t x, size_t y) {
   for (int i = 0; i < num_samples; i++) {
     Vector2D sample = this->gridSampler->get_sample();
     Ray sample_ray = this->camera->generate_ray((origin.x + sample.x) / width, (origin.y + sample.y) / height);
+    sample_ray.depth = max_ray_depth;
     result += this->est_radiance_global_illumination(sample_ray);
   }
   sampleBuffer.update_pixel(result / (double)num_samples, x, y);
