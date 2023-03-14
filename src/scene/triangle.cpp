@@ -27,21 +27,35 @@ bool Triangle::has_intersection(const Ray &r) const {
   // The difference between this function and the next function is that the next
   // function records the "intersection" while this function only tests whether
   // there is a intersection.
+  Vector3D e1 = (p2 - p1), e2 = (p3 - p1);
+  Vector3D s = (r.o - p1), s1 = cross(r.d, e2), s2 = cross(s, e1);
+  Vector3D result = 1 / dot(s1, e1) * Vector3D(dot(s2, e2), dot(s1, s), dot(s2, r.d));
+  double t = result[0], b1 = result[1], b2 = result[2], b3 = 1 - b1 - b2;
 
+  r.max_t = t;
 
-  return true;
-
+  return (t > r.min_t) && (t < r.max_t) && (b1 >= 0) && (b2 >= 0) && (b3 >= 0) && (b1 <= 1) && (b2 <= 1) && (b3 <= 1);
 }
 
 bool Triangle::intersect(const Ray &r, Intersection *isect) const {
   // Part 1, Task 3:
   // implement ray-triangle intersection. When an intersection takes
   // place, the Intersection data should be updated accordingly
+  Vector3D e1 = (p2 - p1), e2 = (p3 - p1);
+  Vector3D s = (r.o - p1), s1 = cross(r.d, e2), s2 = cross(s, e1);
+  Vector3D result = 1 / dot(s1, e1) * Vector3D(dot(s2, e2), dot(s1, s), dot(s2, r.d));
+  double t = result[0], b2 = result[1], b3 = result[2], b1 = 1 - b2 - b3;
 
-
-  return true;
-
-
+  bool isIsect = (t >= r.min_t) && (t <= r.max_t) && (b1 >= 0) && (b2 >= 0) && (b3 >= 0) && (b1 <= 1) && (b2 <= 1) && (b3 <= 1);
+  if (isIsect) {
+    r.max_t = t;
+    isect->t = t;
+    isect->primitive = this;
+    isect->n = n1 * b1 + n2 * b2 + n3 * b3;
+    isect->bsdf = get_bsdf();
+  }
+  
+  return isIsect;
 }
 
 void Triangle::draw(const Color &c, float alpha) const {
